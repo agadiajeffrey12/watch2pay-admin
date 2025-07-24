@@ -2,7 +2,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { 
   Play, 
   Pause, 
@@ -29,26 +29,19 @@ import {
 } from '@/hooks/useVideo'
 
 interface PageProps {
-  params: Promise<{
+  params: {
     id: string
-  }>
+  }
 }
 
 const MoviePreviewPage: React.FC<PageProps> = ({ params }) => {
   const router = useRouter()
-  const [videoId, setVideoId] = useState<string | null>(null)
-  
-  // Resolve params Promise
-  useEffect(() => {
-    params.then(resolvedParams => {
-      setVideoId(resolvedParams.id)
-    })
-  }, [params])
+  const videoId = params.id
 
   console.log('Video ID:', videoId)
   
-  // Video streaming hooks - only call when videoId is available
-  const { data: videoData, isLoading, error, refetch } = useVideoWithSignedUrl(videoId || '')
+  // Video streaming hooks
+  const { data: videoData, isLoading, error, refetch } = useVideoWithSignedUrl(videoId)
   
   const { getStreamUrl } = useVideoStream()
   
@@ -72,116 +65,117 @@ const MoviePreviewPage: React.FC<PageProps> = ({ params }) => {
   const video = videoData?.data?.video
   const streamUrl = videoId ? (video as any)?.streamUrl : ''
 
-  // Enhanced refreshSignedUrl function for seamless playback
-  const refreshSignedUrl = useCallback(async () => {
-    if (!videoRef.current || !video || isRefreshing) return
+  // Function to refresh the signed URL
 
-    try {
-      setIsRefreshing(true)
-      
-      // Store current playback state
-      const wasPlaying = !videoRef.current.paused
-      const currentPosition = videoRef.current.currentTime
-      const currentVolume = videoRef.current.volume
-      const wasMuted = videoRef.current.muted
+// Enhanced refreshSignedUrl function for seamless playback
+const refreshSignedUrl = useCallback(async () => {
+  if (!videoRef.current || !video || isRefreshing) return
 
-      console.log('Refreshing signed URL at position:', currentPosition)
+  try {
+    setIsRefreshing(true)
+    
+    // Store current playback state
+    const wasPlaying = !videoRef.current.paused
+    const currentPosition = videoRef.current.currentTime
+    const currentVolume = videoRef.current.volume
+    const wasMuted = videoRef.current.muted
 
-      // Fetch new signed URL
-      const result = await refetch()
-      const newStreamUrl = (result as any).data?.data?.video?.streamUrl
+    console.log('Refreshing signed URL at position:', currentPosition)
 
-      if (newStreamUrl && newStreamUrl !== streamUrl) {
-        // Create a new video element for preloading
-        const tempVideo = document.createElement('video')
-        tempVideo.src = newStreamUrl
-        tempVideo.currentTime = currentPosition
-        tempVideo.volume = currentVolume
-        tempVideo.muted = wasMuted
-        tempVideo.preload = 'metadata'
+    // Fetch new signed URL
+    const result = await refetch()
+    const newStreamUrl = (result as any).data?.data?.video?.streamUrl
 
-        // Wait for the temp video to be ready
-        const preloadPromise = new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Preload timeout'))
-          }, 10000) // 10 second timeout
+    if (newStreamUrl && newStreamUrl !== streamUrl) {
+      // Create a new video element for preloading
+      const tempVideo = document.createElement('video')
+      tempVideo.src = newStreamUrl
+      tempVideo.currentTime = currentPosition
+      tempVideo.volume = currentVolume
+      tempVideo.muted = wasMuted
+      tempVideo.preload = 'metadata'
 
-          const handleCanPlay = () => {
-            clearTimeout(timeout)
-            tempVideo.removeEventListener('canplay', handleCanPlay)
-            tempVideo.removeEventListener('error', handleError)
-            resolve()
-          }
+      // Wait for the temp video to be ready
+      const preloadPromise = new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Preload timeout'))
+        }, 10000) // 10 second timeout
 
-          const handleError = () => {
-            clearTimeout(timeout)
-            tempVideo.removeEventListener('canplay', handleCanPlay)
-            tempVideo.removeEventListener('error', handleError)
-            reject(new Error('Failed to preload video'))
-          }
-
-          tempVideo.addEventListener('canplay', handleCanPlay)
-          tempVideo.addEventListener('error', handleError)
-        })
-
-        try {
-          // Wait for preload to complete
-          await preloadPromise
-
-          // Now seamlessly switch the source
-          if (videoRef.current) {
-            // Pause current video briefly
-            const shouldResume = wasPlaying
-            if (shouldResume) {
-              videoRef.current.pause()
-            }
-
-            // Switch source
-            videoRef.current.src = newStreamUrl
-            videoRef.current.currentTime = currentPosition
-            videoRef.current.volume = currentVolume
-            videoRef.current.muted = wasMuted
-
-            // Resume playback immediately if it was playing
-            if (shouldResume) {
-              try {
-                await videoRef.current.play()
-              } catch (playError) {
-                console.warn('Could not resume playback:', playError)
-              }
-            }
-
-            console.log('Successfully refreshed URL and maintained position:', currentPosition)
-          }
-        } catch (preloadError) {
-          console.warn('Preload failed, falling back to direct switch:', preloadError)
-          
-          // Fallback: direct switch without preload
-          if (videoRef.current) {
-            videoRef.current.src = newStreamUrl
-            videoRef.current.currentTime = currentPosition
-            videoRef.current.volume = currentVolume
-            videoRef.current.muted = wasMuted
-            
-            if (wasPlaying) {
-              videoRef.current.play().catch(console.error)
-            }
-          }
+        const handleCanPlay = () => {
+          clearTimeout(timeout)
+          tempVideo.removeEventListener('canplay', handleCanPlay)
+          tempVideo.removeEventListener('error', handleError)
+          resolve()
         }
 
-        // Clean up temp video
-        tempVideo.src = ''
-        tempVideo.remove()
+        const handleError = () => {
+          clearTimeout(timeout)
+          tempVideo.removeEventListener('canplay', handleCanPlay)
+          tempVideo.removeEventListener('error', handleError)
+          reject(new Error('Failed to preload video'))
+        }
+
+        tempVideo.addEventListener('canplay', handleCanPlay)
+        tempVideo.addEventListener('error', handleError)
+      })
+
+      try {
+        // Wait for preload to complete
+        await preloadPromise
+
+        // Now seamlessly switch the source
+        if (videoRef.current) {
+          // Pause current video briefly
+          const shouldResume = wasPlaying
+          if (shouldResume) {
+            videoRef.current.pause()
+          }
+
+          // Switch source
+          videoRef.current.src = newStreamUrl
+          videoRef.current.currentTime = currentPosition
+          videoRef.current.volume = currentVolume
+          videoRef.current.muted = wasMuted
+
+          // Resume playback immediately if it was playing
+          if (shouldResume) {
+            try {
+              await videoRef.current.play()
+            } catch (playError) {
+              console.warn('Could not resume playback:', playError)
+            }
+          }
+
+          console.log('Successfully refreshed URL and maintained position:', currentPosition)
+        }
+      } catch (preloadError) {
+        console.warn('Preload failed, falling back to direct switch:', preloadError)
+        
+        // Fallback: direct switch without preload
+        if (videoRef.current) {
+          videoRef.current.src = newStreamUrl
+          videoRef.current.currentTime = currentPosition
+          videoRef.current.volume = currentVolume
+          videoRef.current.muted = wasMuted
+          
+          if (wasPlaying) {
+            videoRef.current.play().catch(console.error)
+          }
+        }
       }
 
-      lastRefreshTimeRef.current = Date.now()
-    } catch (error) {
-      console.error('Failed to refresh signed URL:', error)
-    } finally {
-      setIsRefreshing(false)
+      // Clean up temp video
+      tempVideo.src = ''
+      tempVideo.remove()
     }
-  }, [video, streamUrl, refetch, isRefreshing])
 
+    lastRefreshTimeRef.current = Date.now()
+  } catch (error) {
+    console.error('Failed to refresh signed URL:', error)
+  } finally {
+    setIsRefreshing(false)
+  }
+}, [video, streamUrl, refetch, isRefreshing])
   // Setup auto-refresh interval
   useEffect(() => {
     if (!video || !streamUrl) return
@@ -194,7 +188,7 @@ const MoviePreviewPage: React.FC<PageProps> = ({ params }) => {
     // Set up new interval for 30 minutes (1800000 ms)
     refreshIntervalRef.current = setInterval(() => {
       refreshSignedUrl()
-    }, 30 * 60 * 1000) // 30 minutes
+    }, 30 * 60 * 1000) // 3 minutes
 
     return () => {
       if (refreshIntervalRef.current) {
@@ -319,8 +313,7 @@ const MoviePreviewPage: React.FC<PageProps> = ({ params }) => {
     return () => videoElement.removeEventListener('error', handleVideoError)
   }, [refreshSignedUrl, isRefreshing])
 
-  // Show loading until videoId is resolved
-  if (!videoId || isLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
