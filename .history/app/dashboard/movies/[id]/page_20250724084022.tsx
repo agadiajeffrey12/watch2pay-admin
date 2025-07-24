@@ -63,7 +63,7 @@ const MoviePreviewPage: React.FC<PageProps> = ({ params }) => {
   const lastRefreshTimeRef = useRef<number>(Date.now())
 
   const video = videoData?.data?.video
-  const streamUrl = videoId ? (video as any)?.streamUrl : ''
+  const streamUrl = videoId ? video?.streamUrl : ''
 
   // Function to refresh the signed URL
 
@@ -84,7 +84,7 @@ const refreshSignedUrl = useCallback(async () => {
 
     // Fetch new signed URL
     const result = await refetch()
-    const newStreamUrl = (result as any).data?.data?.video?.streamUrl
+    const newStreamUrl = result.data?.data?.video?.streamUrl
 
     if (newStreamUrl && newStreamUrl !== streamUrl) {
       // Create a new video element for preloading
