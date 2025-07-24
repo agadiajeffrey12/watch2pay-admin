@@ -147,7 +147,7 @@ const SubscriptionsPage = () => {
     }
   ];
 
-  const getStatusColor = (status:string) => {
+  const getStatusColor = (status) => {
     switch (status) {
       case 'active':
         return 'bg-green-100 text-green-800';
@@ -162,7 +162,7 @@ const SubscriptionsPage = () => {
     }
   };
 
-  const getPlanColor = (plan:string) => {
+  const getPlanColor = (plan) => {
     switch (plan) {
       case 'Basic':
         return 'bg-gray-100 text-gray-800';
