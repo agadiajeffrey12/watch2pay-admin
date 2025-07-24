@@ -4,7 +4,7 @@ const nextConfig = {
   images: {
     // Allow images from Wasabi and other external domains
     domains: [
-      'https://s3.us-central-1.wasabisys.com', // Replace with your actual Wasabi domain
+      'your-wasabi-bucket.s3.wasabisys.com', // Replace with your actual Wasabi domain
       's3.wasabisys.com',
       'wasabisys.com',
       // Add other domains as needed
